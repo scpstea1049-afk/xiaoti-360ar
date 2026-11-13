@@ -1,0 +1,77 @@
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+body, html {
+  margin: 0; padding: 0; width: 100%; height: 100%;
+  overflow: hidden;
+  font-family: 'Zen Maru Gothic', 'Noto Sans TC', sans-serif;
+  background-color: #e0f2fe;
+  user-select: none;
+}
+
+#ar-video {
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; z-index: 0; display: none;
+}
+
+#scene-container {
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  z-index: 1; cursor: grab;
+}
+#scene-container:active { cursor: grabbing; }
+
+.ar-hotspot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 15;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s ease;
+  cursor: pointer;
+}
+.ar-hotspot:hover { transform: translate(-50%, -50%) scale(1.08); }
+.ar-hotspot:active { transform: translate(-50%, -50%) scale(0.95); }
+
+@keyframes pulseRing {
+  0% { transform: scale(0.85); opacity: 0.85; }
+  70% { transform: scale(1.45); opacity: 0; }
+  100% { transform: scale(1.45); opacity: 0; }
+}
+.hotspot-pulse { animation: pulseRing 2s infinite; }
+
+@keyframes floatSlow {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+.float-anim { animation: floatSlow 3s ease-in-out infinite; }
+
+.custom-scroll::-webkit-scrollbar { width: 6px; }
+.custom-scroll::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 9999px; }
+.custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+
+#confetti-canvas { position: fixed; inset: 0; pointer-events: none; z-index: 60; }
+
+/* 注音：直式，放在國字右側（「ㄧ」維持橫式字形，不轉成直線） */
+.zy-c { display: inline-flex; align-items: center; white-space: nowrap; }
+.zy-r {
+  display: inline-flex;
+  align-items: center;
+  height: 1em;
+  margin-left: 0.05em;
+  margin-right: 0.04em;
+  font-family: 'Noto Sans TC', sans-serif;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+  opacity: 0.92;
+}
+.zy-col { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; }
+.zy-sym {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  font-size: 0.36em;
+  line-height: 1;
+  letter-spacing: 0;
+  font-feature-settings: "vert" 0, "vrt2" 0;
+}
+.zy-dot { font-size: 0.36em; line-height: 0.6; }
+.zy-tone { font-size: 0.36em; line-height: 1; margin-left: 0.05em; align-self: center; }
+body.no-zy .zy-r { display: none; }
+  
