@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="description" content="品德教育 360AR 互動測驗：孝悌篇「我的超人爸爸媽媽」八大關卡闖關（注音版）" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>品德教育 360AR 互動測驗｜我的超人爸爸媽媽</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <!-- pinyin-pro：用來判斷國字讀音（再轉成注音符號，會依上下文判斷破音字） -->
+  <script src="https://cdn.jsdelivr.net/npm/pinyin-pro@3/dist/index.js"></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="text-slate-800">
+
+  <video id="ar-video" autoplay playsinline muted></video>
+  <div id="scene-container"></div>
+  <div id="hotspots-layer" class="fixed inset-0 pointer-events-none z-10 overflow-hidden"></div>
+  <canvas id="confetti-canvas"></canvas>
+
+  <!-- 頂部 HUD -->
+  <header class="fixed top-0 left-0 right-0 z-20 p-3 sm:p-4 pointer-events-none">
+    <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-2">
+      <div class="pointer-events-auto flex items-center gap-2.5 bg-white/90 backdrop-blur-md px-3.5 py-2 rounded-2xl shadow-lg border-2 border-amber-200">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white font-black text-lg shadow-inner shrink-0">禮</div>
+        <div>
+          <div class="flex items-center gap-1.5">
+            <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">孝悌篇</span>
+            <span class="text-xs font-bold text-slate-400 hidden sm:inline">360AR 八大關卡</span>
+          </div>
+          <h1 class="text-sm sm:text-base font-black text-slate-800 tracking-tight">一、我的超人爸爸媽媽</h1>
+        </div>
+      </div>
+
+      <div class="pointer-events-auto flex items-center gap-2">
+        <div class="bg-white/90 backdrop-blur-md px-3 py-2 rounded-2xl shadow-lg border-2 border-sky-200 flex items-center gap-2">
+          <span class="text-xs sm:text-sm font-bold text-sky-700">闖關進度</span>
+          <span id="progress-badge" class="px-2.5 py-0.5 rounded-xl bg-sky-500 text-white font-black text-xs sm:text-sm">0 / 8</span>
+        </div>
+
+        <button onclick="document.body.classList.toggle('no-zy')" class="bg-white/95 hover:bg-emerald-50 active:scale-95 transition px-3 py-2 rounded-2xl shadow-lg border-2 border-emerald-300 flex items-center gap-1.5 text-emerald-800 font-bold text-xs sm:text-sm">
+          <span>ㄅㄆㄇ</span>
+          <span class="hidden sm:inline">注音開關</span>
+        </button>
+
+        <button onclick="showThemeMenu()" class="bg-white/95 hover:bg-sky-50 active:scale-95 transition px-3 py-2 rounded-2xl shadow-lg border-2 border-sky-300 flex items-center gap-1.5 text-sky-800 font-bold text-xs sm:text-sm">
+          <span>🏠</span>
+          <span class="hidden sm:inline">品德主題</span>
+        </button>
+
+        <div id="student-tag" class="hidden bg-white/90 backdrop-blur-md px-3 py-2 rounded-2xl shadow-lg border-2 border-emerald-200 text-xs sm:text-sm font-black text-emerald-700 whitespace-nowrap"></div>
+
+        <button id="btn-story" class="bg-white/95 hover:bg-amber-50 active:scale-95 transition px-3 py-2 rounded-2xl shadow-lg border-2 border-amber-300 flex items-center gap-1.5 text-amber-800 font-bold text-xs sm:text-sm">
+          <span>📖</span>
+          <span class="hidden sm:inline">課文繪本</span>
+        </button>
+
+        <button id="btn-ar-toggle" class="bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 active:scale-95 transition px-3 py-2 rounded-2xl shadow-lg text-white font-bold text-xs sm:text-sm flex items-center gap-1.5">
+          <span>📷</span>
+          <span id="ar-toggle-text">AR 實境</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 底部提示與八關導覽列 -->
+  <footer class="fixed bottom-0 left-0 right-0 z-20 p-3 sm:p-4 pointer-events-none">
+    <div class="max-w-5xl mx-auto flex flex-col items-center gap-2">
+      <div id="drag-hint" class="bg-slate-900/75 text-white text-xs sm:text-sm px-4 py-1.5 rounded-full backdrop-blur-sm shadow flex items-center gap-2">
+        <span>👆 左右滑動或拖曳畫面環顧 360° 居家場景，點擊發光熱點開始闖關！</span>
+      </div>
+      <div id="station-nav" class="pointer-events-auto w-full bg-white/92 backdrop-blur-md p-2 rounded-3xl shadow-xl border-2 border-sky-200 grid grid-cols-4 sm:grid-cols-8 gap-1.5"></div>
+    </div>
+  </footer>
+
+  <!-- 歡迎開場遮罩 -->
+  <div id="welcome-modal" class="fixed inset-0 z-50 bg-sky-900/60 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border-4 border-amber-300 text-center relative overflow-hidden my-auto">
+      <div class="absolute -top-12 -right-12 w-36 h-36 bg-amber-100 rounded-full opacity-70 pointer-events-none"></div>
+      <div class="absolute -bottom-12 -left-12 w-36 h-36 bg-sky-100 rounded-full opacity-70 pointer-events-none"></div>
+
+      <div class="w-24 h-24 mx-auto mb-4 bg-gradient-to-br from-rose-500 to-red-600 rounded-3xl shadow-lg flex items-center justify-center float-anim border-4 border-amber-300 relative">
+        <svg class="w-14 h-14 text-amber-300" viewBox="0 0 64 64" fill="currentColor">
+          <path d="M32 6L8 22l12 34h24l12-34L32 6zm0 10l12 8-6 20H26l-6-20 12-8z"/>
+          <path d="M32 23l3.2 6.5 7.2 1-5.2 5.1 1.2 7.2L32 39.4l-6.4 3.4 1.2-7.2-5.2-5.1 7.2-1z" fill="#fff"/>
+        </svg>
+      </div>
+
+      <span class="inline-block px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 font-bold text-xs sm:text-sm mb-2 relative">
+        品德教育 360AR 互動任務｜禮．孝悌
+      </span>
+      <h2 class="text-2xl sm:text-3xl font-black text-slate-800 mb-3 relative">我的超人爸爸媽媽</h2>
+      <p class="text-slate-600 text-sm sm:text-base leading-relaxed mb-5 relative">
+        歡迎來到 360° 溫馨小家！請環顧四周尋找 <strong class="text-rose-600">8 個 AR 互動關卡</strong>，跟著爸爸媽媽從早到晚的一天，體會他們像超人一樣的付出，全部通關即可獲得「<strong class="text-amber-600">孝悌小超人勳章</strong>」！
+      </p>
+
+      <div class="mb-5 p-4 rounded-2xl bg-amber-50 border-2 border-amber-200 text-left relative">
+        <div class="text-xs font-black text-amber-700 mb-2">📝 請先輸入你的資料</div>
+        <div class="grid grid-cols-3 gap-3">
+          <div class="col-span-2">
+            <label for="student-name" class="block text-xs font-bold text-slate-500 mb-1">姓名</label>
+            <input id="student-name" type="text" maxlength="12" autocomplete="off" placeholder="例如：王小明" class="w-full px-3 py-2.5 rounded-xl border-2 border-amber-300 focus:border-rose-500 focus:outline-none font-black text-slate-800 text-base" />
+          </div>
+          <div>
+            <label for="student-seat" class="block text-xs font-bold text-slate-500 mb-1">座號</label>
+            <input id="student-seat" type="number" inputmode="numeric" min="1" max="99" placeholder="例如：5" class="w-full px-3 py-2.5 rounded-xl border-2 border-amber-300 focus:border-rose-500 focus:outline-none font-black text-slate-800 text-base text-center" />
+          </div>
+        </div>
+        <p id="student-error" class="hidden mt-2 text-xs font-bold text-rose-600">請輸入姓名與座號（1～99）喔！</p>
+      </div>
+
+      <div class="flex flex-col sm:flex-row gap-3 justify-center relative">
+        <button id="btn-start-experience" class="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-gradient-to-r from-amber-400 via-orange-500 to-rose-500 hover:brightness-105 active:scale-95 transition text-white font-black text-lg shadow-lg flex items-center justify-center gap-2">
+          <span>➡️ 進入品德主題</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 品德主題選單（輸入姓名後顯示） -->
+  <div id="theme-menu" class="hidden fixed inset-0 z-50 bg-gradient-to-b from-sky-100 via-amber-50 to-rose-100 overflow-y-auto">
+    <div class="max-w-4xl mx-auto p-5 sm:p-8">
+      <div class="flex items-center justify-between gap-3 mb-6">
+        <div>
+          <div class="text-xs font-black text-emerald-700 mb-1">品德教育 360AR 互動測驗</div>
+          <h2 id="theme-greeting" class="text-xl sm:text-3xl font-black text-slate-800">你好！</h2>
+          <p class="text-sm text-slate-600 mt-1">請選擇一個品德主題，點進去就會開始闖關喔！</p>
+        </div>
+        <button id="btn-back-to-login" class="shrink-0 px-3 py-2 rounded-xl bg-white/90 border-2 border-slate-200 text-slate-600 font-bold text-xs sm:text-sm shadow active:scale-95 transition">✏️ 修改姓名</button>
+      </div>
+      <div id="theme-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-5"></div>
+    </div>
+  </div>
+
+  <!-- 課文繪本 -->
+  <div id="story-modal" class="fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-2xl w-full max-h-[88vh] flex flex-col shadow-2xl border-4 border-amber-200 overflow-hidden">
+      <div class="p-4 sm:p-5 bg-gradient-to-r from-sky-100 to-amber-100 flex items-center justify-between border-b border-amber-200">
+        <div class="flex items-center gap-2">
+          <span class="text-2xl">📖</span>
+          <h3 class="text-lg sm:text-xl font-black text-slate-800">課文繪本：我的超人爸爸媽媽</h3>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="btn-read-full-story" class="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs sm:text-sm flex items-center gap-1 shadow active:scale-95 transition">
+            <span>🔊 朗讀全文</span>
+          </button>
+          <button onclick="closeStoryModal()" class="w-9 h-9 rounded-xl bg-white/80 hover:bg-white text-slate-600 font-black flex items-center justify-center shadow">✕</button>
+        </div>
+      </div>
+
+      <div class="p-5 sm:p-6 overflow-y-auto custom-scroll space-y-4 text-slate-700 leading-loose text-base sm:text-lg">
+        <div class="p-4 rounded-2xl bg-sky-50 border border-sky-200">
+          <div class="text-xs font-bold text-sky-600 mb-1">🌅 早晨時光</div>
+          <p>一大早，爸爸和媽媽會叫我起床，替我準備早餐，接著送我上學，還要趕到公司上班……</p>
+        </div>
+        <div class="p-4 rounded-2xl bg-amber-50 border border-amber-200">
+          <div class="text-xs font-bold text-amber-600 mb-1">🌙 放學與睡前</div>
+          <p>下班後，爸爸和媽媽會輪流到安親班來接我。回家後，不但要準備晚餐，還要檢查我的作業和幫我洗澡。睡覺前，還會念故事給我聽，讓我安心進入夢鄉。</p>
+        </div>
+        <div class="p-4 rounded-2xl bg-rose-50 border border-rose-200">
+          <div class="text-xs font-bold text-rose-600 mb-1">🦸 愛的力量</div>
+          <p>有一次，我對爸爸和媽媽說：「爸爸、媽媽，您們每天這麼忙，像超人一樣飛來飛去，您們不會累嗎？」</p>
+          <p class="mt-2">爸爸和媽媽笑著說：「不會啊！因為我們愛你啊！為你付出的一切，我們都不會累。」</p>
+          <p class="mt-2">我也開心說：「我愛我的超人爸爸、媽媽！」</p>
+        </div>
+        <div class="p-4 rounded-2xl bg-emerald-100 border-2 border-emerald-300 text-center font-black text-emerald-800 text-lg sm:text-xl">
+          ✨ 家人健康陪伴真快樂。 ✨
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 關卡測驗彈窗 -->
+  <div id="quiz-modal" class="fixed inset-0 z-40 bg-slate-900/65 backdrop-blur-sm hidden items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-3xl max-w-xl w-full max-h-[92vh] flex flex-col shadow-2xl border-4 border-sky-300 overflow-hidden">
+      <div id="quiz-header" class="p-4 bg-gradient-to-r from-sky-500 to-blue-600 text-white flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <span id="quiz-station-icon" class="text-2xl bg-white/20 w-10 h-10 rounded-xl flex items-center justify-center">🍳</span>
+          <div>
+            <div id="quiz-station-subtitle" class="text-xs font-bold text-sky-100">第一關 AR 互動任務</div>
+            <h3 id="quiz-station-title" class="text-base sm:text-lg font-black">載入中</h3>
+          </div>
+        </div>
+        <button onclick="closeQuizModal()" class="w-9 h-9 rounded-xl bg-white/20 hover:bg-white/30 text-white font-black flex items-center justify-center transition">✕</button>
+      </div>
+
+      <div class="p-4 sm:p-6 overflow-y-auto custom-scroll space-y-4">
+        <div id="ar-clue-box" class="p-3.5 rounded-2xl bg-amber-50 border-2 border-amber-200 flex items-start gap-3">
+          <div id="ar-clue-svg" class="w-12 h-12 rounded-xl bg-white shadow-sm flex items-center justify-center shrink-0 text-2xl">🥪</div>
+          <div class="flex-1">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-black text-amber-700">✨ AR 情境線索</span>
+              <button id="btn-speak-question" class="text-xs font-bold px-2.5 py-1 rounded-lg bg-amber-200/70 hover:bg-amber-300 text-amber-900 transition">🔊 念題目</button>
+            </div>
+            <p id="ar-clue-text" class="text-xs sm:text-sm text-slate-700 mt-1 leading-relaxed"></p>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between text-xs font-bold text-slate-500">
+          <span id="question-type-badge" class="px-2.5 py-1 rounded-lg bg-sky-100 text-sky-700">課文是非題</span>
+          <span id="question-counter">第 1 / 2 題</span>
+        </div>
+
+        <h4 id="question-text" class="text-base sm:text-lg font-black text-slate-800 leading-snug">題目載入中...</h4>
+
+        <div id="options-container" class="space-y-2.5"></div>
+
+        <div id="feedback-box" class="hidden p-4 rounded-2xl border-2 transition-all">
+          <div class="flex items-center gap-2 font-black text-base mb-1" id="feedback-title"><span>🎉 答對了！</span></div>
+          <p id="feedback-explanation" class="text-xs sm:text-sm leading-relaxed"></p>
+          <div class="mt-3 flex justify-end">
+            <button id="btn-next-question" class="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-sm shadow active:scale-95 transition">下一題 ➔</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 過關頒獎彈窗 -->
+  <div id="certificate-modal" class="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-md hidden items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border-4 border-amber-400 text-center relative overflow-hidden">
+      <div class="text-xs font-black tracking-widest text-rose-500 uppercase mb-1">MISSION COMPLETE</div>
+      <h3 class="text-2xl sm:text-3xl font-black text-slate-800 mb-2">八關全破！榮譽勳章</h3>
+
+      <div class="my-4 relative inline-block float-anim">
+        <svg class="w-36 h-36 mx-auto drop-shadow-xl" viewBox="0 0 160 160">
+          <path d="M35 65 L15 135 L80 120 L145 135 L125 65 Z" fill="#ef4444" stroke="#b91c1c" stroke-width="3" stroke-linejoin="round"/>
+          <circle cx="80" cy="76" r="52" fill="#facc15" stroke="#ca8a04" stroke-width="4"/>
+          <circle cx="80" cy="76" r="44" fill="#fef9c3" stroke="#eab308" stroke-width="2" stroke-dasharray="4 3"/>
+          <path d="M80 44 L52 60 L64 102 L96 102 L108 60 Z" fill="#dc2626"/>
+          <path d="M80 88 C80 88 64 76 64 67 C64 62 68 59 73 59 C76.5 59 79 61 80 63.5 C81 61 83.5 59 87 59 C92 59 96 62 96 67 C96 76 80 88 80 88 Z" fill="#fef08a"/>
+          <rect x="26" y="108" width="108" height="24" rx="12" fill="#0284c7" stroke="#fff" stroke-width="2.5"/>
+          <text x="80" y="124" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="900">孝悌小超人</text>
+        </svg>
+      </div>
+
+      <p class="text-slate-600 text-sm sm:text-base mb-4">你已經完成全部 8 道 360AR 品德關卡，懂得體貼爸爸媽媽的辛勞與愛！</p>
+
+      <div class="mb-5 py-3 rounded-2xl bg-amber-50 border-2 border-amber-300">
+        <div class="text-xs font-bold text-slate-500 mb-0.5">榮譽小超人</div>
+        <div id="certificate-student" class="text-xl font-black text-slate-800">—</div>
+      </div>
+
+      <div class="flex flex-col sm:flex-row gap-2.5">
+        <button onclick="closeCertificateModal()" class="flex-1 py-3 rounded-2xl bg-sky-500 hover:bg-sky-600 text-white font-black text-sm shadow active:scale-95 transition">繼續逛逛 360° 場景</button>
+        <button onclick="resetAllProgress()" class="flex-1 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm active:scale-95 transition">重新挑戰一次</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-msg" class="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-slate-900/90 text-white px-5 py-2.5 rounded-2xl shadow-xl text-xs sm:text-sm font-bold opacity-0 pointer-events-none transition-opacity duration-300">提示訊息</div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
