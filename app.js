@@ -674,6 +674,7 @@ function setupCameraControls(domElement) {
 
 function focusStation(stationIdx) {
   playSound("click");
+  if (state.no3d) return;
   const station = STATIONS_DATA[stationIdx];
   const TWO_PI = Math.PI * 2;
   const currentNorm = ((state.yaw % TWO_PI) + TWO_PI) % TWO_PI;
@@ -737,6 +738,10 @@ function animate() {
 let mediaStream = null;
 async function toggleArCameraMode() {
   playSound("click");
+  if (state.no3d) {
+    showToast("目前為 2D 闖關模式，無法使用 AR 實境");
+    return;
+  }
   const videoEl = document.getElementById("ar-video");
   const toggleText = document.getElementById("ar-toggle-text");
 
@@ -905,10 +910,14 @@ function updateProgressUI() {
   state.completedStations.forEach((done, idx) => {
     const navCheck = document.getElementById(`nav-check-${idx}`);
     const hotspotDone = document.getElementById(`hotspot-done-${idx}`);
-    navCheck.classList.toggle("hidden", !done);
-    navCheck.classList.toggle("flex", done);
-    hotspotDone.classList.toggle("hidden", !done);
-    hotspotDone.classList.toggle("flex", done);
+    if (navCheck) {
+      navCheck.classList.toggle("hidden", !done);
+      navCheck.classList.toggle("flex", done);
+    }
+    if (hotspotDone) {
+      hotspotDone.classList.toggle("hidden", !done);
+      hotspotDone.classList.toggle("flex", done);
+    }
   });
 }
 
@@ -1018,7 +1027,7 @@ function startTheme(key) {
   playSound("correct");
   document.getElementById("theme-menu").classList.add("hidden");
   focusStation(0);
-  showToast("👆 點擊發光熱點，開始「孝悌」八關闖關！");
+  showToast(state.no3d ? "👆 點選任一關卡，開始「孝悌」八關闖關！" : "👆 點擊發光熱點，開始「孝悌」八關闖關！");
 }
 
 // =========================================================================
@@ -1039,9 +1048,18 @@ function closeStoryModal() {
 }
 
 window.onload = function () {
-  initThreeScene();
   createStationNav();
-  animate();
+  renderThemeMenu();
+
+  // 3D 場景若載入失敗（CDN 被擋、瀏覽器不支援 WebGL），改用 2D 關卡地圖，仍可闖關
+  try {
+    if (typeof THREE === "undefined") throw new Error("Three.js 未載入");
+    initThreeScene();
+    animate();
+  } catch (err) {
+    console.error("3D 場景初始化失敗：", err);
+    enableFallbackMode();
+  }
 
   document.getElementById("btn-start-experience").addEventListener("click", async () => {
     const name = document.getElementById("student-name").value.trim();
@@ -1062,20 +1080,21 @@ window.onload = function () {
     tag.classList.remove("hidden");
     document.getElementById("certificate-student").textContent = `${state.studentSeat} 號　${state.studentName}`;
 
-    if (typeof Tone !== "undefined" && Tone.context.state !== "running") {
-      await Tone.start();
-    }
-    playSound("correct");
+    // 先進入主題選單；音效解鎖失敗也不能卡住畫面
     document.getElementById("welcome-modal").classList.add("hidden");
     showThemeMenu();
+    try {
+      if (typeof Tone !== "undefined" && Tone.context.state !== "running") {
+        await Promise.race([Tone.start(), new Promise((r) => setTimeout(r, 800))]);
+      }
+      playSound("correct");
+    } catch (e) { /* 忽略音訊例外 */ }
   });
 
   document.getElementById("btn-back-to-login").addEventListener("click", () => {
     document.getElementById("theme-menu").classList.add("hidden");
     document.getElementById("welcome-modal").classList.remove("hidden");
   });
-
-  renderThemeMenu();
 
   document.getElementById("btn-story").addEventListener("click", openStoryModal);
   document.getElementById("btn-read-full-story").addEventListener("click", () => {
@@ -1270,3 +1289,44 @@ const zyObserver = new MutationObserver((muts) => {
 annotateNode(document.body);
 zyObserver.observe(document.body, { childList: true, subtree: true });
   
+
+
+// =========================================================================
+// 11. 2D 後備模式（3D 場景無法載入時使用）
+// =========================================================================
+function enableFallbackMode() {
+  state.no3d = true;
+  ["scene-container", "hotspots-layer"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = "none";
+  });
+  const hint = document.getElementById("drag-hint");
+  if (hint) hint.style.display = "none";
+
+  const map = document.createElement("div");
+  map.id = "fallback-map";
+  map.className = "fixed inset-0 z-[5] overflow-y-auto pt-24 pb-32 px-4 bg-gradient-to-b from-sky-100 via-amber-50 to-rose-100";
+  map.innerHTML = `
+    <div class="max-w-4xl mx-auto">
+      <div class="mb-4 p-3 rounded-2xl bg-white/80 border-2 border-amber-200 text-sm font-bold text-slate-700">
+        🏠 目前使用「2D 闖關地圖」模式。請依序點選 8 個關卡開始闖關！
+      </div>
+      <div id="fallback-grid" class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4"></div>
+    </div>`;
+  document.body.appendChild(map);
+
+  const grid = document.getElementById("fallback-grid");
+  STATIONS_DATA.forEach((s, idx) => {
+    const card = document.createElement("button");
+    card.className = `relative p-4 rounded-3xl border-4 border-white shadow-lg bg-gradient-to-br ${COLOR_STYLES[s.color].hotspot} text-white text-center active:scale-95 transition`;
+    card.innerHTML = `
+      <div class="text-4xl mb-1">${s.icon}</div>
+      <div class="text-xs font-black opacity-90">${s.badge}</div>
+      <div class="text-base font-black">${s.shortTitle}</div>
+      <span id="hotspot-done-${idx}" class="hidden absolute -top-2 -right-2 w-7 h-7 rounded-full bg-emerald-500 border-2 border-white text-white text-sm font-black items-center justify-center shadow">✓</span>`;
+    card.onclick = () => openStationQuiz(idx);
+    grid.appendChild(card);
+  });
+
+  showToast("3D 場景無法載入，已改用 2D 闖關地圖");
+}
